@@ -7,5 +7,87 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(survival)
 ```
 
+# Présentation du projet:
+
+### Présentation des données:
+
+```{r data }
+#la base de donnée existe déja sur le package survival 
+head(kidney)
+```
+
+Dans ce projet on analyse le premier et second temps d'apparition de la maladie du rein chez 38 patient (c'est pour cela qu'on a un tableau de 76 ligne).
+
+Notre base de donnée contient les colones suivants :
+
+```{r}
+print(names(kidney))
+```
+
+-   id: unique, correspond à chaque patient.
+
+-   time : le temp du premier ou second récurrence de l'infection.
+
+-   status: 0 ou 1 et indique si le temps de récurrence et censuré 1 reprèsente censuration à droite.
+
+-   age : l'âge du patient.
+
+-   sex: le sexe du patient.
+
+-   disease: la maladie du patient (GN,AN,PKD, OTHER)
+
+-   frail : la fragilité comme estimé dans le papier original.
+
+### choix du modèle :
+
+L'analyse de temps de récurrence de l'infection entre dans ce qu'on appelle l'analyse de survie, parmi les modèles les plus utilisés pour mener de telle étude et la régression de Cox.
+
+Appliquée dans notre à une étude longitudinale (la récidive de l'infection des maladies de reins) représenté par des données censurées.
+
+On propose dans ce projet de mener une étude bayésienne pour estimer les paramètres de la fonction de survie modélisé ici par un une distribution de weibull.
+
+(\#Faut écrire les équations du problème: je vais les écrire après )
+
+on considère exp(...) comme modélisation pour \$\$\mu\$\$ vu qu'elle reprèsente le pramètre shape de la loi de weibull qui est censé être postive.
+
+### Code:
+
+```{r}
+MHWeibull_REffect <- function(data, prior = c(), iter = 5 * 10^4,
+                      prop.sd = c()){
+  ## Data is n x 9 matrix with time, age, status,sex,desease, censoring indicator
+  temp <-data[,1]
+  cens <- data[,2]
+  
+  ## Define a "suitable" initial state for the chain
+  init <- c()
+  acc.rates <- 0
+  chain <- matrix(NA, iter + 1, 6)
+  chain[1,] <- init
+  for (i in 1:iter){
+    
+    current <- chain[i,]
+
+    top <- ### A faire
+
+    bottom <-### A faire
+    alpha <- ### A faire
+    
+    if (runif(1) < alpha){
+      current <- prop
+      acc.rates <- acc.rates + 1
+    }
+    
+    chain[i+1,] <- current
+  }
+  
+  return(list(chain = chain, acc.rates = acc.rates / iter))
+}
+
+
+
+```

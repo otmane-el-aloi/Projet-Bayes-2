@@ -87,7 +87,7 @@ MHWeibull_REffect <- function(data, prior = c(), iter = 5 * 10^4,
   
   return(list(chain = chain, acc.rates = acc.rates / iter))
 }
-
+#
 
 
 ```

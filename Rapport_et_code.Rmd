@@ -94,9 +94,8 @@ MHWeibull_REffect <- function(data, iter = 5 * 10^4,
   init <- c(0,0,0,0,0,0,1,1)
   acc.rates <- 0
   chain <- matrix(NA, iter + 1, 8)
-  colnames(chain)<- c("alpha","beta_age","beta_sex","beta_1","beta_2","beta_3","tau","r")
+  #colnames(chain)<- c("alpha","beta_age","beta_sex","beta_1","beta_2","beta_3","tau","r")
   chain[1,] <- init
-  
   
   #Modifying alpha, beta_age,beta_sex,beta_1,beta_2,beta_3
   for (i in 1:iter){
@@ -108,15 +107,18 @@ MHWeibull_REffect <- function(data, iter = 5 * 10^4,
       b<-rnorm(38,0,current[7])
       #the top 
       scale1=exp(prop[1]+prop[2]*age1+prop[3]*sex+prop[4]*d1+prop[5]*d3+prop[6]*d3+b)
-      scale2=exp(prop[1]+prop[2]*age2+prop[3]*sex+prop[4]*d1+prop[5]*d2+prop[6]*d3+b)
-      shape=prop[8]
-      top <- log(dnorm(prop,0,100))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+      print(scale1)
+      scale2=exp(prop[1]+prop[2]*age2+prop[3]*sex+prop[4]*d1+prop[5]*d2+prop[6]*d3+b)   
+      print(scale2)
+      shape=rep(prop[8],38)
+      print(shape)
+      top <- log(dnorm(prop[j],0,100))+sum(dweibull(time1,shape,scale1))+sum(dweibulll(time2,shape,scale2))+sum(1-pweibull(time1,shape,scale1))+sum(1-pweibull(time2,shape,scale2))
       
       #The bottom
       scale1=exp(current[1]+current[2]*age1+current[3]*sex+current[4]*d1+current[5]*d3+current[6]*d3+b)
       scale2=exp(current[1]+current[2]*age2+current[3]*sex+current[4]*d1+current[5]*d2+current[6]*d3+b)
-      shape=current[8]
-      top <- log(dnorm(prop[j],0,100))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+      shape=rep(current[8],38)
+      bottom <- log(dnorm(prop[j],0,100))+sum(dweibull(time1,shape,scale1))+sum(dweibulll(time2,shape,scale2))+sum(1-pweibull(time1,shape,scale1))+sum(1-pweibull(time2,shape,scale2))
 
       alpha <- exp(top-bottom)
     
@@ -136,14 +138,14 @@ MHWeibull_REffect <- function(data, iter = 5 * 10^4,
   #the top 
   scale1=exp(prop[1]+prop[2]*age1+prop[3]*sex+prop[4]*d1+prop[5]*d3+prop[6]*d3+b)
   scale2=exp(prop[1]+prop[2]*age2+prop[3]*sex+prop[4]*d1+prop[5]*d3+prop[6]*d3+b)
-  shape=prop[8]
-  top <- log(dgamma(prop[7],0.0001,10^(4)))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+  shape=rep(prop[8],38)
+  top <- log(dgamma(prop[7],0.0001,10^(4)))+sum(dweibull(time1,shape,scale1))+sum(dweibulll(time2,shape,scale2))+sum(1-pweibull(time1,shape,scale1))+sum(1-pweibull(time2,shape,scale2))
         
   #The bottom
   scale1=exp(current[1]+current[2]*age1+current[3]*sex+current[4]*d1+current[5]*d3+current[6]*d3+b)
   scale1=exp(current[1]+current[2]*age2+current[3]*d1+current[4]*d2+current[5]*d3+b)
-  shape=current[8]
-  top <- log(dgamma(prop[7],0.0001,10^4))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+  shape=rep(current[8],38)
+  bottom <- log(dgamma(prop[7],0.0001,10^4))+sum(dweibull(time1,shape,scale1))+sum(dweibulll(time2,shape,scale2))+sum(1-pweibull(time1,shape,scale1))+sum(1-pweibull(time2,shape,scale2))
   
   alpha <- exp(top-bottom)
       
@@ -160,14 +162,14 @@ MHWeibull_REffect <- function(data, iter = 5 * 10^4,
   #the top 
   scale1=exp(prop[1]+prop[2]*age1+prop[3]*sex+prop[4]*d1+prop[5]*d3+prop[6]*d3+b)
   scale2=exp(prop[1]+prop[2]*age2+prop[3]*sex+prop[4]*d1+prop[5]*d3+prop[6]*d3+b)
-  shape=prop[8]
-  top <- log(dgamma(prop[8],1,10^(3)))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+  shape=rep(prop[8],38)
+  top <- log(dgamma(prop[8],1,10^(3)))+sum(dweibull(time1,shape,scale1))+sum(dweibulll(time2,shape,scale2))+sum(1-pweibull(time1,shape,scale1))+sum(1-pweibull(time2,shape,scale2))
         
   #The bottom
   scale1=exp(current[1]+current[2]*age1+current[3]*sex+current[4]*d1+current[5]*d3+current[6]*d3+b)
   scale1=exp(current[1]+current[2]*age2+current[3]*d1+current[4]*d2+current[5]*d3+b)
-  shape=current[8]
-  top <- log(dgamma(prop[8],1,10^3))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+  shape=rep(current[8],38)
+  bottom <- log(dgamma(prop[8],1,10^3))+sum(dweibull(time1,shape,scale1))+sum(dweibulll(time2,shape,scale2))+sum(1-pweibull(time1,shape,scale1))+sum(1-pweibull(time2,shape,scale2))
   
   alpha <- exp(top-bottom)
       

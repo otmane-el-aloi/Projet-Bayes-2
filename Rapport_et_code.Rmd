@@ -8,6 +8,8 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(mltools)
+library(data.table)
 library(survival)
 ```
 
@@ -17,7 +19,24 @@ library(survival)
 
 ```{r data }
 #la base de donnée existe déja sur le package survival 
-head(kidney)
+#One hot encoding categorical variables 
+data<-kidney
+data<- one_hot(as.data.table(kidney),cols="disease")
+#Adding a column indicating if it's the first or second occurence of the disease
+data$is_first<-rep(c(1,0),38)
+#Making the data looks like given in the project 
+data1<-data%>%
+  filter(is_first==1)%>%
+  select(-c("id","is_first","frail"))
+data2<-data%>%
+  filter(is_first==0)%>%
+  select(c('time','status','age'))%>%
+  rename("time_2"="time","age_2"="age","status_2"="status")
+data <-cbind(data1,data2)
+data$sex<-data$sex-1
+#Readable order 
+data<-data[,c(1,9,2,10,3,11,4,5,6,7,8)]
+View(data)
 ```
 
 Dans ce projet on analyse le premier et second temps d'apparition de la maladie du rein chez 38 patient (c'est pour cela qu'on a un tableau de 76 ligne).
@@ -25,7 +44,7 @@ Dans ce projet on analyse le premier et second temps d'apparition de la maladie 
 Notre base de donnée contient les colones suivants :
 
 ```{r}
-print(names(kidney))
+print(names(data))
 ```
 
 -   id: unique, correspond à chaque patient.
@@ -57,37 +76,114 @@ on considère exp(...) comme modélisation pour \$\$\mu\$\$ vu qu'elle reprèsen
 ### Code:
 
 ```{r}
-MHWeibull_REffect <- function(data, prior = c(), iter = 5 * 10^4,
-                      prop.sd = c()){
+MHWeibull_REffect <- function(data, iter = 5 * 10^4,
+                      prop.sd = c(1,1,0.5,0.5,0.5,0.5,0.1,0.3)){
   ## Data is n x 9 matrix with time, age, status,sex,desease, censoring indicator
-  temp <-data[,1]
-  cens <- data[,2]
+  time1 <-data[,1]
+  time2<-data[,2]
+  cens1 <- data[,3]
+  cens2 <-data[,4]
+  age1<-data[,5]
+  age2<-data[,6]
+  sex<-data[,7]
+  d1<-data[,8]
+  d2<-data[,9]
+  d3<-data[,10]
   
   ## Define a "suitable" initial state for the chain
-  init <- c()
+  init <- c(0,0,0,0,0,0,1,1)
   acc.rates <- 0
-  chain <- matrix(NA, iter + 1, 6)
+  chain <- matrix(NA, iter + 1, 8)
+  colnames(chain)<- c("alpha","beta_age","beta_sex","beta_1","beta_2","beta_3","tau","r")
   chain[1,] <- init
+  
+  
+  #Modifying alpha, beta_age,beta_sex,beta_1,beta_2,beta_3
   for (i in 1:iter){
-    
     current <- chain[i,]
+    for (j in 1:6){
+      prop<-current
+      #Proposition
+      prop[j]<-rnorm(1,current[j],prop.sd[j])
+      b<-rnorm(38,0,current[7])
+      #the top 
+      scale1=exp(prop[1]+prop[2]*age1+prop[3]*sex+prop[4]*d1+prop[5]*d3+prop[6]*d3+b)
+      scale2=exp(prop[1]+prop[2]*age2+prop[3]*sex+prop[4]*d1+prop[5]*d2+prop[6]*d3+b)
+      shape=prop[8]
+      top <- log(dnorm(prop,0,100))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+      
+      #The bottom
+      scale1=exp(current[1]+current[2]*age1+current[3]*sex+current[4]*d1+current[5]*d3+current[6]*d3+b)
+      scale2=exp(current[1]+current[2]*age2+current[3]*sex+current[4]*d1+current[5]*d2+current[6]*d3+b)
+      shape=current[8]
+      top <- log(dnorm(prop[j],0,100))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
 
-    top <- ### A faire
-
-    bottom <-### A faire
-    alpha <- ### A faire
+      alpha <- exp(top-bottom)
     
-    if (runif(1) < alpha){
+      if (runif(1) < alpha){
       current <- prop
       acc.rates <- acc.rates + 1
-    }
+      }
     
-    chain[i+1,] <- current
+    }
   }
   
+  #Modfifying tau 
+  prop<-current
+  #Proposition
+  prop[7]<-rnorm(1,current[7],prop.sd[7])
+  b<-rnorm(38,0,current[8]) #(Je sais s'il faut regéner ça :())
+  #the top 
+  scale1=exp(prop[1]+prop[2]*age1+prop[3]*sex+prop[4]*d1+prop[5]*d3+prop[6]*d3+b)
+  scale2=exp(prop[1]+prop[2]*age2+prop[3]*sex+prop[4]*d1+prop[5]*d3+prop[6]*d3+b)
+  shape=prop[8]
+  top <- log(dgamma(prop[7],0.0001,10^(4)))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+        
+  #The bottom
+  scale1=exp(current[1]+current[2]*age1+current[3]*sex+current[4]*d1+current[5]*d3+current[6]*d3+b)
+  scale1=exp(current[1]+current[2]*age2+current[3]*d1+current[4]*d2+current[5]*d3+b)
+  shape=current[8]
+  top <- log(dgamma(prop[7],0.0001,10^4))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+  
+  alpha <- exp(top-bottom)
+      
+  if (runif(1) < alpha){
+    current <- prop
+    acc.rates <- acc.rates + 1
+    }
+       
+  #Modfifying r
+  prop<-current
+  #Proposition
+  prop[8]<-rnorm(1,current[8],prop.sd[8])
+  b<-rnorm(38,0,current[8]) #(Je sais s'il faut regéner ça :())
+  #the top 
+  scale1=exp(prop[1]+prop[2]*age1+prop[3]*sex+prop[4]*d1+prop[5]*d3+prop[6]*d3+b)
+  scale2=exp(prop[1]+prop[2]*age2+prop[3]*sex+prop[4]*d1+prop[5]*d3+prop[6]*d3+b)
+  shape=prop[8]
+  top <- log(dgamma(prop[8],1,10^(3)))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+        
+  #The bottom
+  scale1=exp(current[1]+current[2]*age1+current[3]*sex+current[4]*d1+current[5]*d3+current[6]*d3+b)
+  scale1=exp(current[1]+current[2]*age2+current[3]*d1+current[4]*d2+current[5]*d3+b)
+  shape=current[8]
+  top <- log(dgamma(prop[8],1,10^3))+sum(dweibull(time1,scale1,shape))+sum(dweibulll(time2,scale2,shape))+sum(1-pweibull(time1,scale1,shape))+sum(1-pweibull(time2,scale2,shape))
+  
+  alpha <- exp(top-bottom)
+      
+  if (runif(1) < alpha){
+    current <- prop
+    acc.rates <- acc.rates + 1
+    }
+      
+  
+  
+  
+  chain[i+1,] <- current
+    
   return(list(chain = chain, acc.rates = acc.rates / iter))
 }
-#
+
 
 
 ```

@@ -131,7 +131,7 @@ MHWeibull_REffect <- function(iter = 10^4,
     }
 
     #Modfifying sigma2 (conjugate prior)
-    current[7] <- rinvgamma(1,shape=10^(-3)+38/2, scale=10^(-3)+sum(current[9:46]^2)/2)
+    current[7] <- 1/rgamma(1,shape=10^(-3)+38/2, rate=10^(-3)+sum(current[9:46]^2)/2)
   
     
     #Modfifying r

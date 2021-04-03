@@ -40,49 +40,11 @@ data<-data[,c(1,9,2,10,3,11,4,5,6,7,8)]
 View(data)
 ```
 
-Dans ce projet on analyse le premier et second temps d'apparition de la maladie du rein chez 38 patient (c'est pour cela qu'on a un tableau de 76 ligne).
-
-Notre base de donnée contient les colones suivants :
-
-```{r}
-print(names(data))
-```
-
--   id: unique, correspond à chaque patient.
-
--   time : le temp du premier ou second récurrence de l'infection.
-
--   status: 0 ou 1 et indique si le temps de récurrence est censuré ou non (0 représente la censuration à droite)
-
--   age : l'âge du patient.
-
--   sex: le sexe du patient.
-
--   disease: la maladie du patient (GN,AN,PKD, OTHER)
-
--   frail : la fragilité comme estimé dans le papier original.
-
-### choix du modèle :
-
-L'analyse de temps de récurrence de l'infection entre dans ce qu'on appelle l'analyse de survie, parmi les modèles les plus utilisés pour mener de telle étude et la régression de Cox.
-
-Appliquée dans notre à une étude longitudinale (la récidive de l'infection des maladies de reins) représenté par des données censurées.
-
-On propose dans ce projet de mener une étude bayésienne pour estimer les paramètres de la fonction de survie modélisé ici par un une distribution de weibull.
-
-(\#Faut écrire les équations du problème: je vais les écrire après )
-
-on considère exp(...) comme modélisation pour \$\$\mu\$\$ vu qu'elle reprèsente le pramètre shape de la loi de weibull qui est censé être postive.
-
 ### Code:
-
-```{r}
-
-```
 
 ```{r MCMC}
 MHWeibull_REffect <- function(data,iter = 10^4,
-                              prop.sd = c(1,1,1,1,1,1,1,1)){
+                              prop.sd = c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)){
   
   time1 <-data$time
   time2<-data$time_2
@@ -95,15 +57,15 @@ MHWeibull_REffect <- function(data,iter = 10^4,
   d2<-data$disease_AN
   d3<-data$disease_PKD
   ## Define a "suitable" initial state for the chain
-  init <- c(0,0,0,0,0,0,1,1, rep(0,38))
+  init <- c(-4,0,-1,0,0,-1,1,1, rep(1,38))
   acc.rates <- rep(0, 8+38)
-  chain <- matrix(NA, iter + 1, 8+38)
+  chain <- matrix(0, iter + 1, 8+38)
   colnames(chain) <- c("alpha", "beta_age", "beta_sex", "beta1", "beta_2","beta3", "tau", "r", paste("b", 1:38, sep =""))
   chain[1,] <- init
   
   for (i in 1:iter){
+    
     current <- chain[i,]
-    print(current)
     #Modifying alpha, beta_age,beta_sex,beta_1,beta_2,beta_3
     for (j in 1:6){
       prop<-current
@@ -115,16 +77,16 @@ MHWeibull_REffect <- function(data,iter = 10^4,
       scale2=exp(prop[1]+prop[2]*age2+prop[3]*sex+prop[4]*d1+prop[5]*d2+prop[6]*d3+prop[9:46])   
       shape=rep(prop[8],38)
 
-      top <- dnorm(prop[j],0,100, log = TRUE) + sum(cens1*dweibull(time1,shape=shape,scale=scale1, log=TRUE)+cens2*dweibull(time2,shape=shape,scale=scale2, log=TRUE)+(1-cens1)*pweibull(time1,shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE)+(1-cens2)*pweibull(time2,shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
+      top <- dnorm(prop[j],0,100, log = TRUE) + sum(cens1*dweibull(time1,shape=shape,scale=scale1, log=TRUE))+sum(cens2*dweibull(time2,shape=shape,scale=scale2, log=TRUE))+sum((1-cens1)*pweibull(time1,shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE))+sum((1-cens2)*pweibull(time2,shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
       
       #The bottom
       scale1=exp(current[1]+current[2]*age1+current[3]*sex+current[4]*d1+current[5]*d2+current[6]*d3+current[9:46])
       scale2=exp(current[1]+current[2]*age2+current[3]*sex+current[4]*d1+current[5]*d2+current[6]*d3+current[9:46])
       shape=rep(current[8],38)
       
-      bottom <- dnorm(current[j],0,100, log = TRUE) + sum(cens1*dweibull(time1,shape=shape,scale=scale1, log=TRUE)+cens2*dweibull(time2,shape=shape,scale=scale2, log=TRUE)+(1-cens1)*pweibull(time1,shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE)+(1-cens2)*pweibull(time2,shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
-      alpha <- exp(top-bottom)
-      if (runif(1) < alpha){
+      bottom <- dnorm(current[j],0,100, log = TRUE) + sum(cens1*dweibull(time1,shape=shape,scale=scale1, log=TRUE))+sum(cens2*dweibull(time2,shape=shape,scale=scale2, log=TRUE))+sum((1-cens1)*pweibull(time1,shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE))+sum((1-cens2)*pweibull(time2,shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
+      alpha1 <- exp(top-bottom)
+      if (runif(1) < alpha1){
         current[j] <- prop[j]
         acc.rates[j] <- acc.rates[j] + 1
       }
@@ -132,30 +94,30 @@ MHWeibull_REffect <- function(data,iter = 10^4,
 
     #Modfifying tau (conjugate prior)
     current[7] <-rgamma(1,shape=10^(-3)+38/2, rate=10^(-3)+sum(current[9:46]^2)/2)
-  
+    
     
     #Modfifying r
     
     #Proposition
-    prop[8]<-rnorm(1,current[8],prop.sd[8])
-
+    prop[8]<-rlnorm(1,log(current[8]),prop.sd[8])
+    kernel.ratio<-(prop[8]/current[8])
     #The top 
     scale1=exp(prop[1]+prop[2]*age1+prop[3]*sex+prop[4]*d1+prop[5]*d2+prop[6]*d3+prop[9:46])
     scale2=exp(prop[1]+prop[2]*age2+prop[3]*sex+prop[4]*d1+prop[5]*d2+prop[6]*d3+prop[9:46])
     shape=rep(prop[8],38)
     
-    top <- dgamma(prop[8],1,10^(-3), log = TRUE) + sum(cens1*dweibull(time1,shape=shape,scale=scale1, log=TRUE)+cens2*dweibull(time2,shape=shape,scale=scale2, log=TRUE)+(1-cens1)*pweibull(time1,shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE)+(1-cens2)*pweibull(time2,shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
+    top <- dgamma(prop[8],1,10^(-3), log = TRUE) + sum(cens1*dweibull(time1,shape=shape,scale=scale1, log=TRUE))+sum(cens2*dweibull(time2,shape=shape,scale=scale2, log=TRUE))+sum((1-cens1)*pweibull(time1,shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE))+sum((1-cens2)*pweibull(time2,shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
     
     #The bottom
     scale1=exp(current[1]+current[2]*age1+current[3]*sex+current[4]*d1+current[5]*d2+current[6]*d3+current[9:46])
     scale2=exp(current[1]+current[2]*age2+current[3]*sex+current[4]*d1+current[5]*d2+current[6]*d3+current[9:46])
     shape=rep(current[8],38)
     
-    bottom <- dgamma(current[8],shape=1,rate=10^(-3), log = TRUE) + sum(cens1*dweibull(time1,shape=shape,scale=scale1, log=TRUE)+(1-cens2)*dweibull(time2,shape=shape,scale=scale2, log=TRUE)+(1-cens1)*pweibull(time1,shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE)+(1-cens2)*pweibull(time2,shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
+    bottom <- dgamma(current[8],shape=1,rate=10^(-3), log = TRUE) + sum(cens1*dweibull(time1,shape=shape,scale=scale1, log=TRUE))+sum(cens2*dweibull(time2,shape=shape,scale=scale2, log=TRUE))+sum((1-cens1)*pweibull(time1,shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE))+sum((1-cens2)*pweibull(time2,shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
   
-    alpha <- exp(top-bottom)
+    alpha2<- exp(top-bottom)*kernel.ratio
   
-    if (runif(1) < alpha){
+    if (runif(1) < alpha2){
       current[8] <- prop[8]
       acc.rates[8] <- acc.rates[8] + 1
     }
@@ -164,7 +126,27 @@ MHWeibull_REffect <- function(data,iter = 10^4,
     for (j in 9:46){
       prop<-current
       #Proposition
-      prop[j]<-rnorm(1,0,1/sqrt(tau))
+      prop[j]<-rnorm(1,current[j],prop.sd[8])
+      
+      #The top 
+      scale1=exp(prop[1]+prop[2]*age1[j-8]+prop[3]*sex[j-8]+prop[4]*d1[j-8]+prop[5]*d2[j-8]+prop[6]*d3[j-8]+prop[j])
+      scale2=exp(prop[1]+prop[2]*age2[j-8]+prop[3]*sex[j-8]+prop[4]*d1[j-8]+prop[5]*d2[j-8]+prop[6]*d3[j-8]+prop[j])   
+      shape=rep(prop[8],2)
+      
+      top <- dnorm(prop[j],0,100, log = TRUE) + sum(cens1[j-8]*dweibull(time1[j-8],shape=shape,scale=scale1, log=TRUE))+sum(cens2[j-8]*dweibull(time2[j-8],shape=shape,scale=scale2, log=TRUE))+sum((1-cens1[j-8])*pweibull(time1[j-8],shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE))+sum((1-cens2[j-8])*pweibull(time2[j-8],shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
+      
+      #The bottom
+      scale1=exp(current[1]+current[2]*age1[j-8]+current[3]*sex[j-8]+current[4]*d1[j-8]+current[5]*d2[j-8]+current[6]*d3[j-8]+current[j])
+      scale2=exp(current[1]+current[2]*age2[j-8]+current[3]*sex[j-8]+current[4]*d1[j-8]+current[5]*d2[j-8]+current[6]*d3[j-8]+current[j])
+      shape=rep(current[8],2)
+      
+      bottom <- dnorm(prop[j],0,100, log = TRUE) +  sum(cens1[j-8]*dweibull(time1[j-8],shape=shape,scale=scale1, log=TRUE))+sum(cens2[j-8]*dweibull(time2[j-8],shape=shape,scale=scale2, log=TRUE))+sum((1-cens1[j-8])*pweibull(time1[j-8],shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE))+sum((1-cens2[j-8])*pweibull(time2[j-8],shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
+      
+      alpha3 <- exp(top-bottom)
+      if (runif(1) < alpha3){
+        current[j] <- prop[j]
+        acc.rates[j] <- acc.rates[j] + 1
+      }
 
     }
     
@@ -176,4 +158,18 @@ MHWeibull_REffect <- function(data,iter = 10^4,
 
 ```{r result}
 out <- MHWeibull_REffect(data)
+```
+
+```{r }
+#le taux d'acceaptation
+out$acc.rates
+
+
+```
+
+```{r}
+expression<- c("alpha", "beta_age", "beta_sex", "beta1", "beta_2","beta3", "tau", "r")
+#plot
+for (j in 1:15)
+  plot(out$chain[,j], type = "l", ylab = expression[j])
 ```

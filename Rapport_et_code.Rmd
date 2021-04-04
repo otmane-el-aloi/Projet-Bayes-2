@@ -44,7 +44,7 @@ View(data)
 
 ```{r MCMC}
 MHWeibull_REffect <- function(data,iter = 10^4,
-                              prop.sd = c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)){
+                              prop.sd = c(0.7,1,0.5,0.5,0.5,0.5,0.5,0.5)){
   
   time1 <-data$time
   time2<-data$time_2
@@ -57,7 +57,7 @@ MHWeibull_REffect <- function(data,iter = 10^4,
   d2<-data$disease_AN
   d3<-data$disease_PKD
   ## Define a "suitable" initial state for the chain
-  init <- c(-4,0,-1,0,0,-1,1,1, rep(1,38))
+  init <- c(0,0,0,0,0,0,1,1, rep(1,38))
   acc.rates <- rep(0, 8+38)
   chain <- matrix(0, iter + 1, 8+38)
   colnames(chain) <- c("alpha", "beta_age", "beta_sex", "beta1", "beta_2","beta3", "tau", "r", paste("b", 1:38, sep =""))
@@ -126,27 +126,9 @@ MHWeibull_REffect <- function(data,iter = 10^4,
     for (j in 9:46){
       prop<-current
       #Proposition
-      prop[j]<-rnorm(1,current[j],prop.sd[8])
-      
-      #The top 
-      scale1=exp(prop[1]+prop[2]*age1[j-8]+prop[3]*sex[j-8]+prop[4]*d1[j-8]+prop[5]*d2[j-8]+prop[6]*d3[j-8]+prop[j])
-      scale2=exp(prop[1]+prop[2]*age2[j-8]+prop[3]*sex[j-8]+prop[4]*d1[j-8]+prop[5]*d2[j-8]+prop[6]*d3[j-8]+prop[j])   
-      shape=rep(prop[8],2)
-      
-      top <- dnorm(prop[j],0,100, log = TRUE) + sum(cens1[j-8]*dweibull(time1[j-8],shape=shape,scale=scale1, log=TRUE))+sum(cens2[j-8]*dweibull(time2[j-8],shape=shape,scale=scale2, log=TRUE))+sum((1-cens1[j-8])*pweibull(time1[j-8],shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE))+sum((1-cens2[j-8])*pweibull(time2[j-8],shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
-      
-      #The bottom
-      scale1=exp(current[1]+current[2]*age1[j-8]+current[3]*sex[j-8]+current[4]*d1[j-8]+current[5]*d2[j-8]+current[6]*d3[j-8]+current[j])
-      scale2=exp(current[1]+current[2]*age2[j-8]+current[3]*sex[j-8]+current[4]*d1[j-8]+current[5]*d2[j-8]+current[6]*d3[j-8]+current[j])
-      shape=rep(current[8],2)
-      
-      bottom <- dnorm(prop[j],0,100, log = TRUE) +  sum(cens1[j-8]*dweibull(time1[j-8],shape=shape,scale=scale1, log=TRUE))+sum(cens2[j-8]*dweibull(time2[j-8],shape=shape,scale=scale2, log=TRUE))+sum((1-cens1[j-8])*pweibull(time1[j-8],shape=shape,scale=scale1, log=TRUE, lower.tail = FALSE))+sum((1-cens2[j-8])*pweibull(time2[j-8],shape=shape,scale=scale2, log=TRUE, lower.tail = FALSE))
-      
-      alpha3 <- exp(top-bottom)
-      if (runif(1) < alpha3){
-        current[j] <- prop[j]
-        acc.rates[j] <- acc.rates[j] + 1
-      }
+      prop[j]<-rnorm(1,0,1/sqrt(current[7]))
+            
+
 
     }
     

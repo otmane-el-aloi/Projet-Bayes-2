@@ -11,6 +11,7 @@ library(tidyverse)
 library(mltools)
 library(data.table)
 library(survival)
+library(evd)
 ```
 
 # Présentation du projet:
@@ -18,7 +19,6 @@ library(survival)
 ### Présentation des données:
 
 ```{r data }
-#la base de donnée existe déja sur le package survival 
 #One hot encoding categorical variables 
 data<-kidney
 data<- one_hot(as.data.table(kidney),cols="disease")
@@ -42,8 +42,8 @@ View(data)
 ### Code:
 
 ```{r MCMC}
-MHWeibull_REffect <- function(data,iter = 10^4,
-                              prop.sd = c(0.7,0.01,0.7,0.5,0.5,0.5,0.5,0.7)){
+MHWeibull_REffect <- function(data,iter = 10^5,
+                              prop.sd = c(0.7,2,0.5,0.5,0.5,0.5,0.5,1)){
   
   time1 <-data$time
   time2<-data$time_2
@@ -98,7 +98,7 @@ MHWeibull_REffect <- function(data,iter = 10^4,
     #Modfifying r
     
     #Proposition
-    prop[8]<-rlnorm(1,log(current[8]),prop.sd[7])
+    prop[8]<-rlnorm(1,log(current[8]),prop.sd[8])
     kernel.ratio<-(prop[8]/current[8])
     #The top 
     scale1=exp(prop[1]+prop[2]*age1+prop[3]*sex+prop[4]*d1+prop[5]*d2+prop[6]*d3+prop[9:46])
@@ -123,8 +123,11 @@ MHWeibull_REffect <- function(data,iter = 10^4,
   
     #Modifying bi (on s'intéresse seulement au patient i)
     for (j in 9:46){
+      prop<-current
+      #Proposition
+      prop[j]<-rnorm(1,0,1/sqrt(current[7]))
+            
 
-      current[j]<-rnorm(1,0,0.6367)
 
     }
     
@@ -141,10 +144,39 @@ out <- MHWeibull_REffect(data)
 ```{r }
 #le taux d'acceaptation
 out$acc.rates
+
 ```
 
 ```{r}
-##À mettre dans la console
+#Plotting the chain 
+expression<- c("alpha", "beta_age", "beta_sex", "beta1", "beta_2","beta3", "tau", "r")
+#plot
+for (j in 1:8)
+  plot(out$chain[,j], type = "l", ylab = expression[j])
+```
+
+```{r}
+
+#dropping burning period
+out$chain<- out$chain[-(1:1500),]##burnin
+
+#Chain
+for (j in 1:8)
+  plot(out$chain[,j], type = "l", ylab = expression[j])
+
+
+```
+
+```{r}
+#Posterior  main estimation 
+theta_hat <-colMeans(out$chain)
+
+print(theta_hat[1:8])
+```
+
+```{r}
+
+#Run in console:
 expression<- c("alpha", "beta_age", "beta_sex", "beta1", "beta2","beta3", "tau", "r")
 par(mfrow = c(8, 2),mar = c(4, 5, 0.5, 0.5))
 #plot
@@ -152,4 +184,5 @@ for (j in 1:8){
   plot(out$chain[,j], type = "l", main = "",ylab=expression[j])
   plot(density(out$chain[,j]), type = "l", main = "")
 }
+
 ```
